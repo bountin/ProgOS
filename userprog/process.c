@@ -22,6 +22,7 @@
 /* data structure to communicate with the thread initializing a new process */
 struct start_aux_data {
   char *filename;
+  char *args;
   struct semaphore startup_sem;
   struct thread *parent_thread;
   struct process *new_process;
@@ -32,8 +33,8 @@ struct lock filesys_lock;
 
 /* prototypes */
 static thread_func start_process NO_RETURN;
-static bool load (char *filename, void (**eip) (void), void **esp);
-static bool setup_stack (void **esp);
+static bool load (void *aux, void (**eip) (void), void **esp);
+static bool setup_stack (void *aux, void **esp);
 static bool init_fd_table (struct fd_table * table);
 
 /* Initialize the filesystem lock */
@@ -64,25 +65,36 @@ process_current ()
    and support command strings such as "echo A B C". You
    will also need to change `load` and `setup_stack`. */
 tid_t
-process_execute (const char *filename)
+process_execute (const char *cmd)
 {
   tid_t tid = TID_ERROR;
-  char *fn_copy = NULL;
+  char *cmd_copy = NULL;
+  char *filename = NULL;
   struct start_aux_data *aux_data = NULL;
 
-  /* Setup the auxiliary data for starting up the new process */
-  fn_copy = palloc_get_page (0);
+  /* Setup auxiliary data for starting up the new process */
+  cmd_copy = palloc_get_page (0);
+  filename = palloc_get_page (0);
   aux_data = palloc_get_page (0);
-  if (aux_data == NULL || fn_copy == NULL)
+  if (cmd_copy == NULL || filename == NULL || aux_data == NULL)
     goto done;
-  strlcpy (fn_copy, filename, PGSIZE);
-  aux_data->filename = fn_copy;
+
+  strlcpy (cmd_copy, cmd, PGSIZE);
+  char delim = ' ';
+  char *saveptr = "";
+  char *fn;
+  fn = strtok_r(cmd_copy, &delim, &saveptr);
+  strlcpy(filename, fn, PGSIZE);
+  strlcpy(cmd_copy, cmd, PGSIZE);
+
+  aux_data->filename = filename;
+  aux_data->args = cmd_copy;
   aux_data->parent_thread = thread_current ();
   aux_data->new_process = NULL;
   sema_init (&aux_data->startup_sem, 0);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (fn_copy, PRI_DEFAULT, start_process, aux_data);
+  tid = thread_create (filename, PRI_DEFAULT, start_process, aux_data);
   if (tid == TID_ERROR)
     goto done;
 
@@ -97,7 +109,8 @@ process_execute (const char *filename)
 		  &aux_data->new_process->parentelem);
 
  done:
-  palloc_free_page (fn_copy);
+  palloc_free_page (filename);
+  palloc_free_page (cmd_copy);
   palloc_free_page (aux_data);
   return tid;
 }
@@ -132,7 +145,7 @@ start_process (void *aux)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  if (! load (aux_data->filename, &if_.eip, &if_.esp)) {
+  if (! load (aux_data, &if_.eip, &if_.esp)) {
     thread->process = NULL;
   } else {
     aux_data->new_process = thread->process;
@@ -354,8 +367,11 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (char *file_name, void (**eip) (void), void **esp)
+load (void *aux, void (**eip) (void), void **esp)
 {
+  struct start_aux_data *aux_data = (struct start_aux_data*) aux;
+  char *file_name = aux_data->filename;
+
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -453,7 +469,7 @@ load (char *file_name, void (**eip) (void), void **esp)
   }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (aux, esp))
     goto done;
 
   /* Start address. */
@@ -582,23 +598,90 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
    You will implement this function in the Project 0.
    Consider using `hex_dump` for debugging purposes */
 static bool
-setup_stack (void **esp)
+setup_stack (void *aux, void **esp)
 {
+  struct start_aux_data *aux_data = (struct start_aux_data*) aux;
+  const char *args = aux_data->args;
   uint8_t *kpage = NULL;
 
+  /* Create and install stack page in userspace */
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage == NULL)
       return false;
-
   if (! install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true)) {
       palloc_free_page (kpage);
       return false;
   }
 
-  /* Currently we assume that 'argc = 0' */
-  *esp = PHYS_BASE - 12;
+  /* Initialize two stacks, one growing from bottom to top and the other one the other way round.
+     They are merged in the end */
+  void *stp = PHYS_BASE;
+  void **argpp = PHYS_BASE - PGSIZE;
+
+  /* Tokenize and save the arguments on the stp stack (bottom to top!) */
+  char *args_copy = palloc_get_page(0);
+  strlcpy (args_copy, args, PGSIZE);
+
+  /* Get and save argv[0] */
+  char *delim = " ";
+  char *saveptr = "";
+  char *arg = NULL;
+  int argc = 1;
+  arg = strtok_r(args_copy, delim, &saveptr);
+  ASSERT (arg != NULL);
+  stp -= strnlen(arg, PGSIZE) + 1;
+  strlcpy(stp, arg, strnlen(arg, PGSIZE) + 1);
+
+  *argpp = stp;
+  argpp++;
+
+  if ((void *) (argpp + 5*sizeof(void *)) >= stp)
+    goto error;
+
+  /* Get and save argv[1..] */
+  while ((arg = strtok_r(NULL, delim, &saveptr)) != NULL) {
+    ASSERT(strnlen(arg, 2) > 0);
+    argc++;
+    stp -= strnlen(arg, PGSIZE) + 1;
+    strlcpy(stp, arg, strnlen(arg, PGSIZE) + 1);
+
+    /* Save the argv[] pointer for later */
+    *argpp = stp;
+    argpp++;
+
+    if ((void *)(argpp + 5*sizeof(void *)) >= stp)
+      goto error;
+  }
+
+  /* Alignment */
+  stp -= (uint32_t)stp % 4;
+
+  /* Argv is null terminated. Since the page is already nulled, just increase the stp. */
+  stp -= sizeof(void *);
+
+  /* 'Move' the argv pointer array on top of the stack. */
+  stp -= argc * sizeof(void *);
+  memcpy(stp, PHYS_BASE - PGSIZE, argc * sizeof(void *));
+
+  /* the pointer to the argv array */
+  stp -= sizeof(void *);
+  *(void **)stp = stp + sizeof(void *);
+
+  /* argc */
+  stp -= sizeof(int);
+  *((int *) stp) = argc;
+
+  /* Return address which will never be used */
+  stp -= sizeof(void *);
+
+  *esp = stp;
+  palloc_free_page(args_copy);
 
   return true;
+
+error:
+  palloc_free_page(args_copy);
+  return false;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
