@@ -8,9 +8,11 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -27,6 +29,10 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+/* List of processes which are waiting for a timer event and are
+   therefore blocked. */
+static struct list timer_blocked_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -92,6 +98,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&timer_blocked_list);
 
 #ifdef USERPROG
   process_init ();
@@ -137,6 +144,18 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  /* Check timer blocked threads */
+  struct list_elem *e;
+  for (e = list_begin (&timer_blocked_list);
+       e != list_end (&timer_blocked_list);
+       e = list_next (e))
+  {
+    struct thread_timer_blocked *ttb = list_entry (e, struct thread_timer_blocked, elem);
+    if (ttb->unlock_tick <= timer_ticks ()) {
+      thread_timer_unblock (ttb);
+    }
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -214,6 +233,28 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   return tid;
+}
+
+void
+thread_timer_block (int64_t unlock_tick)
+{
+  enum intr_level old_level = intr_disable();
+
+  struct thread_timer_blocked *ttb = malloc (sizeof (struct thread_timer_blocked));
+  ttb->thread = thread_current ();
+  ttb->unlock_tick = unlock_tick;
+  list_push_back (&timer_blocked_list, &ttb->elem);
+  thread_block ();
+  intr_set_level (old_level);
+}
+
+void
+thread_timer_unblock (struct thread_timer_blocked *ttb)
+{
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  thread_unblock (ttb->thread);
+  list_remove (&ttb->elem);
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled

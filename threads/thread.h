@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include "threads/synch.h"
 
 /* States in a thread's life cycle. */
@@ -105,6 +106,13 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
   };
 
+struct thread_timer_blocked
+  {
+    struct thread *thread;
+    struct list_elem elem;
+    int64_t unlock_tick;
+  };
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -118,6 +126,9 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
+
+void thread_timer_block (int64_t unlock_tick);
+void thread_timer_unblock (struct thread_timer_blocked *ttb);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
