@@ -30,26 +30,62 @@ Alexander Svozil <e1026213@student.tuwien.ac.at>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+/* List of processes which are waiting for a timer event and are
+   therefore blocked. */
+static struct list timer_blocked_list;
+
+
+/* A thread_timer_blocked is the bucket of an thread that was blocked by
+a timer. */ 
+struct thread_timer_blocked
+  {
+    struct thread *thread; /* Pointer to te blocked thread */
+    struct list_elem elem; /* Struct for list  */
+    int64_t unlock_tick;   /* Tick on which thread should be unblocked */
+  };
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+timer_sleep() invokes thread_timer_block() which adds the current thread to
+a list containing all by a timer blocked threads. This list is sorted ascendingly
+by the unlock tick. Then it blocks the current thread and schedules another one 
+by calling thread_block(). All this is secured by saving and disabling interrupts.
+The wakeup time is then checked during thread_tick() which may unblock all
+late threads.
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+The list is ordered ascendingly. This costs some time when inserting a new thread
+to the list but it saves cycles every time when thread_tick() checks the list for
+unblocking because ot only have to search until a tick number in the future is
+found.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
+timer_sleep() itself does nothing against race conditions. But thread_timer_block()
+which is called by timer_sleep() disables interrupts temporary.
+
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+
+See above. During timer_sleep() Interrupts are disabled.
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+I've chosen this design for simplicity. It's easily understandable and does not have
+any drawbacks. At least I have not found any. But I've changed some behaviour just
+after reading this document again: the Insertion and Selection logic. Before I had
+an unordered list but at question A3 I thought that this part could be optimized.
 
 			   ARGUMENT PASSING
 			   ================
@@ -61,7 +97,6 @@ Alexander Svozil <e1026213@student.tuwien.ac.at>
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
 Added to the struct start_aux_data:
-
 	char *args /* The complete arguments string */
 
 ---- ALGORITHMS ----
@@ -81,21 +116,29 @@ it (**argv, argc, fake return address).
 Overflowing is prevented by counting the length of both stacks,
 adding some extra space for the remaining data (see above) and 
 checking this after each argument. If there is an overflow setup_stack()
-returns false but it could be easily implemented that longer stacks are 
-possible by adding another page(s) behind the first one and filling them
-too.
+returns false but it could be easily implemented that bigger stacks are 
+possible by adding more page(s) one and filling them too.
 
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
-Because strtok() is not thread-safe and strtok_r() is.
+Because strtok() is not thread-safe and strtok_r() is by using a user
+given state variable.
 
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
 
+Since the shell is a userspace program, different users can use different
+shells and so use different conventions for specifying the program name
+on the one hand and the arguments on the other one. This way no changes
+at the kernel have to be made to support this.
 
+Furthermore this approach keeps the kernel smaller: First this reduces
+its space and memory footprint and secondly also reduces kernel code
+complexibility which may reduce the bug count and security hole
+opportunities.
 
 			   SURVEY QUESTIONS
 			   ================
@@ -109,7 +152,7 @@ the quarter.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
-The process part is challenging but I think that the level is just fine
+The assignments are challenging but I think that the level is just fine
 for a optional course ;-)
 
 >> Did you find that working on a particular part of the assignment gave
@@ -117,6 +160,9 @@ for a optional course ;-)
 
 The thread switching part with the swapping return addresses was one of
 the parts that I found interesting and that was new to me too.
+
+I've also read the assembler code of the boot code and the thread switching
+because I was interested in 'real world' assembler examples.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
