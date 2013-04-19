@@ -128,6 +128,15 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+bool
+less_blocked_thread (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread_timer_blocked *thread_a = list_entry(a, struct thread_timer_blocked, elem);
+  struct thread_timer_blocked *thread_b = list_entry(b, struct thread_timer_blocked, elem);
+
+  return thread_a->unlock_tick <= thread_b->unlock_tick;
+}
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
@@ -152,9 +161,10 @@ thread_tick (void)
        e = list_next (e))
   {
     struct thread_timer_blocked *ttb = list_entry (e, struct thread_timer_blocked, elem);
-    if (ttb->unlock_tick <= timer_ticks ()) {
+    if (ttb->unlock_tick <= timer_ticks ())
       thread_timer_unblock (ttb);
-    }
+    else
+      break;
   }
 
   /* Enforce preemption. */
@@ -243,7 +253,7 @@ thread_timer_block (int64_t unlock_tick)
   struct thread_timer_blocked *ttb = malloc (sizeof (struct thread_timer_blocked));
   ttb->thread = thread_current ();
   ttb->unlock_tick = unlock_tick;
-  list_push_back (&timer_blocked_list, &ttb->elem);
+  list_insert_ordered (&timer_blocked_list, &ttb->elem, less_blocked_thread, (void *)NULL);
   thread_block ();
   intr_set_level (old_level);
 }
