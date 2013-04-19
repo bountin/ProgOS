@@ -83,9 +83,9 @@ process_execute (const char *cmd)
   char delim = ' ';
   char *saveptr = "";
   char *fn;
-  fn = strtok_r(cmd_copy, &delim, &saveptr);
-  strlcpy(filename, fn, PGSIZE);
-  strlcpy(cmd_copy, cmd, PGSIZE);
+  fn = strtok_r (cmd_copy, &delim, &saveptr);
+  strlcpy (filename, fn, PGSIZE);
+  strlcpy (cmd_copy, cmd, PGSIZE);
 
   aux_data->filename = filename;
   aux_data->args = cmd_copy;
@@ -619,7 +619,7 @@ setup_stack (void *aux, void **esp)
   void **argpp = PHYS_BASE - PGSIZE;
 
   /* Tokenize and save the arguments on the stp stack (bottom to top!) */
-  char *args_copy = palloc_get_page(0);
+  char *args_copy = palloc_get_page (0);
   strlcpy (args_copy, args, PGSIZE);
 
   /* Get and save argv[0] */
@@ -627,10 +627,10 @@ setup_stack (void *aux, void **esp)
   char *saveptr = "";
   char *arg = NULL;
   int argc = 1;
-  arg = strtok_r(args_copy, delim, &saveptr);
+  arg = strtok_r (args_copy, delim, &saveptr);
   ASSERT (arg != NULL);
-  stp -= strnlen(arg, PGSIZE) + 1;
-  strlcpy(stp, arg, strnlen(arg, PGSIZE) + 1);
+  stp -= strnlen (arg, PGSIZE) + 1;
+  strlcpy (stp, arg, strnlen (arg, PGSIZE) + 1);
 
   *argpp = stp;
   argpp++;
@@ -639,48 +639,49 @@ setup_stack (void *aux, void **esp)
     goto error;
 
   /* Get and save argv[1..] */
-  while ((arg = strtok_r(NULL, delim, &saveptr)) != NULL) {
-    ASSERT(strnlen(arg, 2) > 0);
+  while ((arg = strtok_r(NULL, delim, &saveptr)) != NULL)
+  {
+    ASSERT (strnlen (arg, 2) > 0);
     argc++;
-    stp -= strnlen(arg, PGSIZE) + 1;
-    strlcpy(stp, arg, strnlen(arg, PGSIZE) + 1);
+    stp -= strnlen (arg, PGSIZE) + 1;
+    strlcpy (stp, arg, strnlen (arg, PGSIZE) + 1);
 
     /* Save the argv[] pointer for later */
     *argpp = stp;
     argpp++;
 
-    if ((void *)(argpp + 5*sizeof(void *)) >= stp)
+    if ((void *) (argpp + 5*sizeof(void *)) >= stp)
       goto error;
   }
 
   /* Alignment */
-  stp -= (uint32_t)stp % 4;
+  stp -= (uint32_t) stp % 4;
 
   /* Argv is null terminated. Since the page is already nulled, just increase the stp. */
-  stp -= sizeof(void *);
+  stp -= sizeof (void *);
 
   /* 'Move' the argv pointer array on top of the stack. */
-  stp -= argc * sizeof(void *);
+  stp -= argc * sizeof (void *);
   memcpy(stp, PHYS_BASE - PGSIZE, argc * sizeof(void *));
 
   /* the pointer to the argv array */
-  stp -= sizeof(void *);
-  *(void **)stp = stp + sizeof(void *);
+  stp -= sizeof (void *);
+  *(void **) stp = stp + sizeof (void *);
 
   /* argc */
-  stp -= sizeof(int);
+  stp -= sizeof (int);
   *((int *) stp) = argc;
 
   /* Return address which will never be used */
-  stp -= sizeof(void *);
+  stp -= sizeof (void *);
 
   *esp = stp;
-  palloc_free_page(args_copy);
+  palloc_free_page (args_copy);
 
   return true;
 
 error:
-  palloc_free_page(args_copy);
+  palloc_free_page (args_copy);
   return false;
 }
 
