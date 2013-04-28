@@ -77,6 +77,9 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+bool less_blocked_thread(const struct list_elem*, const struct list_elem*, void*);
+bool great_priority_thread(const struct list_elem*, const struct list_elem*, void*);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -136,6 +139,16 @@ less_blocked_thread (const struct list_elem *a, const struct list_elem *b, void 
 
   return thread_a->unlock_tick <= thread_b->unlock_tick;
 }
+
+bool
+great_priority_thread (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *thread_a = list_entry(a, struct thread, elem);
+  struct thread *thread_b = list_entry(b, struct thread, elem);
+
+  return thread_a->priority > thread_b->priority;
+}
+
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
@@ -300,7 +313,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, great_priority_thread, (void *)NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -371,7 +384,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, great_priority_thread, (void *)NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
