@@ -140,6 +140,9 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
+/* Check if thread is greater than the other */
+bool great_priority_thread (const struct list_elem*, const struct list_elem*, void*);
+
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);

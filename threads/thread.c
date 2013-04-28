@@ -78,7 +78,6 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 bool less_blocked_thread(const struct list_elem*, const struct list_elem*, void*);
-bool great_priority_thread(const struct list_elem*, const struct list_elem*, void*);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
