@@ -745,6 +745,7 @@ void remove_thread_lock_blocked (struct lock *lock)
     struct thread_lock_acquired *tla = list_entry (e, struct thread_lock_acquired, elem);
     if (tla->thread->tid == thread_current ()->tid && tla->lock == lock) {
       list_remove (e);
+      free (tla);
       sema_up (&lock_acquired_list_sem);
       thread_current ()->priority = thread_current ()->priority_original;
       return;
