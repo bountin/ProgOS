@@ -117,6 +117,7 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   sema->value++;
   if (!list_empty (&sema->waiters)) {
+    list_sort (&sema->waiters, great_priority_thread, (void *)NULL);
     struct thread *t = list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem);
     thread_unblock (t);
@@ -242,6 +243,7 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
   remove_thread_lock_blocked (lock);
   sema_up (&lock->semaphore);
+  thread_yield ();
 }
 
 /* Returns true if the current thread holds LOCK, false

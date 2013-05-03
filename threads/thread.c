@@ -607,20 +607,24 @@ next_thread_to_run (void)
         struct list_elem *e;
         bool first = true;
         bool found = false;
+        struct thread_lock_acquired *prev_bt;
         do {
           if (!first) {
+            prev_bt = bt;
             for (e = list_begin (&lock_acquired_list);
                  e != list_end (&lock_acquired_list);
                  e = list_next (e))
             {
               bt = list_entry (e, struct thread_lock_acquired, elem);
-              if (bt->thread->tid == holder->tid) {
+              if (bt->thread->tid == holder->tid && prev_bt->lock != bt->lock) {
                 found = true;
                 break;
               }
             }
-            if (!found)
-              NOT_REACHED();
+            if (!found) {
+              /* No more priority donation possible */
+              return list_entry (list_pop_front (&ready_list), struct thread, elem);
+            }
           }
           first = false;
 
