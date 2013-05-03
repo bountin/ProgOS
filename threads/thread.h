@@ -114,6 +114,13 @@ struct thread_timer_blocked
     int64_t unlock_tick;
   };
 
+struct thread_lock_acquired
+  {
+    struct thread *thread;
+    struct list_elem elem;
+    struct lock *lock;
+  };
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -155,5 +162,9 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Priority donation */
+void add_thread_lock_blocked (struct lock *lock);
+void remove_thread_lock_blocked (struct lock *lock);
 
 #endif /* threads/thread.h */

@@ -34,6 +34,11 @@ static struct list all_list;
    therefore blocked. */
 static struct list timer_blocked_list;
 
+/* List of processes which are in the critical section of a lock. */
+static struct list lock_acquired_list;
+static struct semaphore lock_acquired_list_sem;
+static bool threading_started = false;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -78,6 +83,7 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 bool less_blocked_thread(const struct list_elem*, const struct list_elem*, void*);
+bool great_thread_blocked_priority(const struct list_elem*, const struct list_elem*, void *);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -101,6 +107,8 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&timer_blocked_list);
+  list_init (&lock_acquired_list);
+  sema_init (&lock_acquired_list_sem, 1);
 
 #ifdef USERPROG
   process_init ();
@@ -128,6 +136,7 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
+  threading_started = true;
 }
 
 bool
@@ -674,3 +683,55 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+bool great_thread_blocked_priority(const struct list_elem *a, const struct list_elem *b, UNUSED void *aux)
+{
+  struct thread_lock_acquired *elem_a = list_entry (a, struct thread_lock_acquired, elem);
+  struct thread_lock_acquired *elem_b = list_entry (b, struct thread_lock_acquired, elem);
+
+  return elem_a->thread->priority_original >= elem_b->thread->priority_original;
+}
+
+void add_thread_lock_blocked (struct lock *lock)
+{
+  if (!threading_started)
+    return;
+
+  if (thread_current ()->tid == 0)
+    return;
+
+  struct thread_lock_acquired *tla = malloc (sizeof (struct thread_lock_acquired));
+  tla->thread = thread_current ();
+  tla->lock = lock;
+
+  sema_down (&lock_acquired_list_sem);
+  list_insert_ordered (&lock_acquired_list, &tla->elem, great_thread_blocked_priority, (void *)NULL);
+  sema_up (&lock_acquired_list_sem);
+}
+
+void remove_thread_lock_blocked (struct lock *lock)
+{
+  if (!threading_started)
+    return;
+  if (thread_current ()->tid == 0)
+    return;
+
+  sema_down (&lock_acquired_list_sem);
+  ASSERT (!list_empty (&lock_acquired_list));
+
+  struct list_elem *e;
+  for (e = list_begin (&lock_acquired_list);
+       e != list_end (&lock_acquired_list);
+       e = list_next (e))
+  {
+    struct thread_lock_acquired *tla = list_entry (e, struct thread_lock_acquired, elem);
+    if (tla->thread->tid == thread_current ()->tid && tla->lock == lock) {
+      list_remove (e);
+      sema_up (&lock_acquired_list_sem);
+      thread_current ()->priority = thread_current ()->priority_original;
+      return;
+    }
+  }
+
+  NOT_REACHED ();
+}
