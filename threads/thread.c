@@ -415,11 +415,17 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  struct thread *t = thread_current ();
+
   bool to_schedule_or_not_to = false;
-  if (new_priority < thread_current ()->priority)
+  if (new_priority < t->priority)
     to_schedule_or_not_to = true;
 
-  thread_current ()->priority = new_priority;
+  /* No donation OR donation and a higher priority */
+  if (t->priority == t->priority_original || new_priority > t->priority)
+      t->priority = new_priority;
+
+  t->priority_original = new_priority;
 
   if (to_schedule_or_not_to)
     thread_yield ();
@@ -548,6 +554,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->magic = THREAD_MAGIC;
   t->priority = priority;
+  t->priority_original = priority;
   list_push_back (&all_list, &t->allelem);
 #ifdef USERPROG
   list_init(&t->children);
