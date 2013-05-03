@@ -603,9 +603,30 @@ next_thread_to_run (void)
       if (t->priority >= bt->thread->priority) { /* TODO: >= OR > ??? */
         return list_entry (list_pop_front (&ready_list), struct thread, elem);
       } else {
-        struct lock *l = bt->lock;
-        struct thread *holder = l->holder;
-        holder->priority = bt->thread->priority;
+        struct thread *holder;
+        struct list_elem *e;
+        bool first = true;
+        bool found = false;
+        do {
+          if (!first) {
+            for (e = list_begin (&lock_acquired_list);
+                 e != list_end (&lock_acquired_list);
+                 e = list_next (e))
+            {
+              bt = list_entry (e, struct thread_lock_acquired, elem);
+              if (bt->thread->tid == holder->tid) {
+                found = true;
+                break;
+              }
+            }
+            if (!found)
+              NOT_REACHED();
+          }
+          first = false;
+
+          holder = bt->lock->holder;
+          holder->priority = bt->thread->priority;
+        } while (holder->status != THREAD_READY);
 
         list_remove (&holder->elem);
 
