@@ -40,7 +40,7 @@ struct desc
     size_t block_size;          /* Size of each element in bytes. */
     size_t blocks_per_arena;    /* Number of blocks in an arena. */
     struct list free_list;      /* List of free blocks. */
-    struct lock lock;           /* Lock. */
+    struct semaphore lock;           /* Lock. */
   };
 
 /* Magic number for detecting arena corruption. */
@@ -80,7 +80,7 @@ malloc_init (void)
       d->block_size = block_size;
       d->blocks_per_arena = (PGSIZE - sizeof (struct arena)) / block_size;
       list_init (&d->free_list);
-      lock_init (&d->lock);
+      sema_init (&d->lock, 1);
     }
 }
 
@@ -119,7 +119,7 @@ malloc (size_t size)
       return a + 1;
     }
 
-  lock_acquire (&d->lock);
+  sema_down (&d->lock);
 
   /* If the free list is empty, create a new arena. */
   if (list_empty (&d->free_list))
@@ -130,7 +130,7 @@ malloc (size_t size)
       a = palloc_get_page (0);
       if (a == NULL) 
         {
-          lock_release (&d->lock);
+          sema_up (&d->lock);
           return NULL; 
         }
 
@@ -149,7 +149,7 @@ malloc (size_t size)
   b = list_entry (list_pop_front (&d->free_list), struct block, free_elem);
   a = block_to_arena (b);
   a->free_cnt--;
-  lock_release (&d->lock);
+  sema_up (&d->lock);
   return b;
 }
 
@@ -233,7 +233,7 @@ free (void *p)
           memset (b, 0xcc, d->block_size);
 #endif
   
-          lock_acquire (&d->lock);
+          sema_down (&d->lock);
 
           /* Add block to free list. */
           list_push_front (&d->free_list, &b->free_elem);
@@ -252,7 +252,7 @@ free (void *p)
               palloc_free_page (a);
             }
 
-          lock_release (&d->lock);
+          sema_up (&d->lock);
         }
       else
         {

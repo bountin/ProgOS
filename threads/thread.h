@@ -90,6 +90,7 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int priority_original;
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c */
@@ -111,6 +112,13 @@ struct thread_timer_blocked
     struct thread *thread;
     struct list_elem elem;
     int64_t unlock_tick;
+  };
+
+struct thread_lock_acquired
+  {
+    struct thread *thread;
+    struct list_elem elem;
+    struct lock *lock;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -154,5 +162,9 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Priority donation */
+void add_thread_lock_blocked (struct lock *lock);
+void remove_thread_lock_blocked (struct lock *lock);
 
 #endif /* threads/thread.h */
