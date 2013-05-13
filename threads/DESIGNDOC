@@ -31,6 +31,8 @@ Alexander Svozil <e1026213@student.tuwien.ac.at>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+original priority thread.h
+struct list with thread lock
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
@@ -41,18 +43,36 @@ Alexander Svozil <e1026213@student.tuwien.ac.at>
 >> a lock, semaphore, or condition variable wakes up first?
 
 Semaphore:
-Our list of waiters is sorted descendently by priority, so when the Semaphore is free, the thread with the highest priority is awoken.
+Our list of waiters is sorted in descendending order by priority, so when the semaphore is freed, the thread with the highest priority is awoken.
 
 Lock:
 The lock uses a semaphore, so this is implicit.
 
 Condition Variable:
+We sort the waiters for every condition in descending order by priority, so when the condition is met, the the process with highest priority from the waiters is awoken. 
 
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
 
+When a thread calls lock_acquire it is put on the global ordered list of all threads who have already called lock_acquire, but not lock_release(lock acquired list). It is then blocked.
+With the next call of next_thread_to_run we compare the priority of the highest ready thread with the priority of the highest thread in the lockaquired list.
+Now there are several cases to consider:
+The lock acquired list is empty: The thread with the highest priority on the ready list is run.
+The highest priority thread in the ready list has a higher priority than the highest priority thread in the lock acquired list:The thread with the highest priority on the ready list is run.  
+The highest priority thread in the ready has a lower priority then the highest priority thread in the lock acquired list:
+
+We save the holder of the lock that the highest priority thread waits on and donate the priority to the holder. If the holder is not in the ready list, we repeat the folling steps until the holder is in the ready list:
+
+1. Search the lock acquired list for the thread that the current holder waits for.
+2. If there is no such thread (it doesn't wait on a lock), return the highest priority ready thread.
+3. If the thread is found; we save the found thread as the holder, and donate the priority to the new holder.
+
+Now the holder is in the ready list and we can run this thread (removing it from the ready list(!!!) ) 
+
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+The thread is removed from our lock acquired list and thread yield is called triggering the algorithm described above.
+
 
 ---- SYNCHRONIZATION ----
 
@@ -60,10 +80,17 @@ Condition Variable:
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+Potential race condition:
+If the current thread calls thread_set_priority(), and the thread has a donated priority, the donated priority could be overwritten incorrectly.
+We avoided this race by saving only the highest donated priority and the original priority. The original priority is overwritten in any case but the donated priority is only overwritted when the new priority is higher than the donated priority.
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+The reason we chose this design is, that it is a very straightforward way to implement priority donations. It automatically eliminates many special cases, because it
+only tries to run the highest thread in the lock acquired list.
 
 			   SURVEY QUESTIONS
 			   ================
