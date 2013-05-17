@@ -1,0 +1,17 @@
+00000000000i[APIC?] local apic in  initializing
+========================================================================
+                       Bochs x86 Emulator 2.3.7
+               Build from CVS snapshot, on June 3, 2008
+========================================================================
+00000000000i[     ] LTDL_LIBRARY_PATH not set. using compile time default '/usr/local/lib/bochs/plugins'
+00000000000i[     ] BXSHARE not set. using compile time default '/usr/local/share/bochs'
+00000000000i[     ] reading configuration from bochsrc.txt
+00000000000e[     ] user_shortcut: old-style syntax detected
+00000000000i[     ] lt_dlhandle is 0x9532168
+00000000000i[PLGIN] loaded plugin libbx_nogui.la
+00000000000i[     ] installing nogui module as the Bochs GUI
+00000000000i[     ] using log file bochsout.txt
+========================================================================
+Bochs is exiting with the following message:
+[UNMP ] Shutdown port: shutdown requested
+========================================================================

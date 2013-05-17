@@ -30,10 +30,17 @@ Alexander Svozil <e1026213@student.tuwien.ac.at>
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+ + int priority_original; in struct thread in thread.h. It is the value of the original priority (without donation.)
+struct thread_lock_acquired
+  {
+    struct thread *thread;
+    struct list_elem elem;
+    struct lock *lock;
+  };  
+Describes the struct to resolve dependencies between threads.
 
-original priority thread.h
-struct list with thread lock
 >> B2: Explain the data structure used to track priority donation.
+The struct thread_lock_acquired stores a pointer to a thread and a pointer to a lock in a list to keep track of Lock dependencies circulating.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
 

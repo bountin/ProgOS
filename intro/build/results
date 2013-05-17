@@ -1,0 +1,11 @@
+pass tests/intro/alarm-clock/alarm-single
+pass tests/intro/alarm-clock/alarm-multiple
+pass tests/intro/alarm-clock/alarm-simultaneous
+pass tests/intro/alarm-clock/alarm-zero
+pass tests/intro/alarm-clock/alarm-negative
+pass tests/intro/userprog-args/args-none
+pass tests/intro/userprog-args/args-single
+pass tests/intro/userprog-args/args-multiple
+pass tests/intro/userprog-args/args-many
+pass tests/intro/userprog-args/args-dbl-space
+pass tests/intro/userprog-args/args-limit

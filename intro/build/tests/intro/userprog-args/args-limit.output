@@ -1,0 +1,49 @@
+Copying tests/intro/userprog-args/args-limit to scratch partition...
+/usr/bin/qemu -hda /tmp/r_nosM4Bxd.dsk -m 4 -net none -nographic -monitor null
+PiLo hda1
+Loading.........
+Kernel command line: -q -f extract run args-limit
+Pintos booting with 4,096 kB RAM...
+383 pages available in kernel pool.
+383 pages available in user pool.
+Calibrating timer...  209,510,400 loops/s.
+hda: 5,040 sectors (2 MB), model "QM00001", serial "QEMU HARDDISK"
+hda1: 155 sectors (77 kB), Pintos OS kernel (20)
+hda2: 4,096 sectors (2 MB), Pintos file system (21)
+hda3: 94 sectors (47 kB), Pintos scratch (22)
+filesys: using hda2
+scratch: using hda3
+Formatting file system...done.
+Boot complete.
+Extracting ustar archive from scratch device into file system...
+Putting 'args-limit' into the file system...
+Erasing ustar archive...
+Executing 'args-limit':
+(args-limit) begin
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+(args-limit) success. at least 64 command line arguments are supported.
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(0)
+args-limit: exit(-1)
+args-limit: exit(-1)
+(args-limit) success. arguments with at least 100 bytes are supported.
+(args-limit) end
+args-limit: exit(0)
+Execution of 'args-limit' complete.
+Timer: 59 ticks
+Thread: 30 idle ticks, 24 kernel ticks, 5 user ticks
+hda2 (filesys): 915 reads, 192 writes
+hda3 (scratch): 93 reads, 2 writes
+Console: 1317 characters output
+Keyboard: 0 keys pressed
+Exception: 2 page faults
+Powering off...

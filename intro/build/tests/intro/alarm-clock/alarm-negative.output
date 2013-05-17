@@ -1,0 +1,26 @@
+warning: can't find squish-pty, so terminal input will fail
+bochs -q
+PiLo hda1
+Loading.........
+Kernel command line: -kernel-test -q -f run alarm-negative
+Pintos booting with 4,096 kB RAM...
+383 pages available in kernel pool.
+383 pages available in user pool.
+Calibrating timer...  204,600 loops/s.
+hda: 3,024 sectors (1 MB), model "BXHD00011", serial "Generic 1234"
+hda1: 155 sectors (77 kB), Pintos OS kernel (20)
+hda2: 2,048 sectors (1 MB), Pintos file system (21)
+filesys: using hda2
+Boot complete.
+Executing 'alarm-negative':
+(alarm-negative) begin
+(alarm-negative) PASS
+(alarm-negative) end
+Execution of 'alarm-negative' complete.
+Timer: 103 ticks
+Thread: 31 idle ticks, 75 kernel ticks, 0 user ticks
+hda2 (filesys): 0 reads, 0 writes
+Console: 646 characters output
+Keyboard: 0 keys pressed
+Exception: 0 page faults
+Powering off...
