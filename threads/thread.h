@@ -126,6 +126,8 @@ struct thread_lock_acquired
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+int test;
+
 void thread_init (void);
 void thread_start (void);
 

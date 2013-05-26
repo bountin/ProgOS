@@ -113,6 +113,7 @@ main (void)
   malloc_init ();
   paging_init ();
 
+  test = 1;
   /* Segmentation. */
 #ifdef USERPROG
   tss_init ();
