@@ -14,4 +14,4 @@ struct spt_elem {
 
 struct hash *supp_pagedir_create (void);
 
-void page_load (void *addr);
+bool page_load (void *addr);

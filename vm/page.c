@@ -35,30 +35,27 @@ struct hash *supp_pagedir_create (void)
   return spd;
 }
 
-void page_load (void *addr)
+bool page_load (void *addr)
 {
   struct spt_elem search;
   struct spt_elem *spt;
   struct hash_elem *e;
   struct thread *t = thread_current ();
+  bool writeable;
 
   ASSERT (!hash_empty (t->supp_pagedir));
 
-  // Dafuq??
+  /* Get a page of memory. */
+  uint8_t *kpage = palloc_get_page (PAL_USER);
+  if (kpage == NULL)
+    return false;
+
   search.upage = (uint32_t)addr & ~PGMASK;
-
-//  printf ("XX: %p - %p\n", addr, search.upage);
-
   e = hash_find (t->supp_pagedir, &search.hash_elem);
 
-  if (e != NULL)
+  if (e != NULL) {
     // Page was found in the suppl. page directory
     spt = hash_entry (e, struct spt_elem, hash_elem);
-
-    /* Get a page of memory. */
-    uint8_t *kpage = palloc_get_page (PAL_USER);
-    if (kpage == NULL)
-      return false;
 
     /* Load this page. */
     file_seek (spt->file, spt->file_offset);
@@ -67,12 +64,18 @@ void page_load (void *addr)
       return false;
     }
     memset (kpage + spt->read_bytes, 0, spt->zero_bytes);
-
-    /* Add the page to the process's address space. */
-    if (!install_page (spt->upage, kpage, spt->writeable)) {
-      palloc_free_page (kpage);
-      return false;
-    }
+    writeable = spt->writeable;
+  } else {
+    return false;
+    memset (kpage, 0, PGSIZE);
+    writeable = true;
   }
 
+  /* Add the page to the process's address space. */
+  if (!install_page (spt->upage, kpage, writeable)) {
+    palloc_free_page (kpage);
+    return false;
+  }
+
+  return true;
 }
