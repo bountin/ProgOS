@@ -153,6 +153,11 @@ page_fault (struct intr_frame *f)
      body, adding code that brings in the page to
      which fault_addr refers. */
   if (is_user_vaddr(fault_addr)) {
+    if (not_present) {
+      page_load (fault_addr);
+      return;
+    }
+
     if (! user) {
       /* syscall exception; set eax and eip */
       f->eip = (void*)f->eax;

@@ -2,6 +2,7 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+#include "filesys/off_t.h"
 
 /* In the current implementation, the capacity is fixed to 1024 (PGSIZE/4) */
 struct fd_table {
@@ -43,5 +44,7 @@ struct file* process_get_file(int fd);
 void process_lock_filesys (void);
 void process_unlock_filesys (void);
 bool process_close_file(int fd);
+
+bool install_page (void *upage, void *kpage, bool writable);
 
 #endif /* userprog/process.h */
