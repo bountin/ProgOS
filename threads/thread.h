@@ -102,6 +102,7 @@ struct thread
     struct list children;               /* Threads can hold processes, but not vice versa */
     uint32_t *pagedir;                  /* Page directory. */
     struct hash *supp_pagedir;
+    struct hash *mmap_id_dir;
 #endif
 
     /* Owned by thread.c. */

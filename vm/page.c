@@ -79,3 +79,36 @@ bool page_load (void *addr)
 
   return true;
 }
+
+static unsigned
+mmap_id_hash (const struct hash_elem *elem, void *aux UNUSED)
+{
+  const struct mmap_id_elem *p = hash_entry (elem, struct mmap_id_elem, hash_elem); 
+  return hash_bytes (&p->mmap_id, sizeof p->mmap_id);
+}
+
+static bool
+mmap_id_less (const struct hash_elem *a_, const struct hash_elem *b_,
+           void *aux UNUSED)
+{
+  const struct mmap_id_elem *a = hash_entry (a_, struct mmap_id_elem, hash_elem);
+  const struct mmap_id_elem *b = hash_entry (b_, struct mmap_id_elem, hash_elem);
+
+  return a->mmap_id < b->mmap_id;
+}
+
+struct hash *mmap_id_create (void)
+{
+  struct hash *spd = malloc (sizeof (struct hash));
+
+  hash_init (spd, mmap_id_hash, mmap_id_less, (void *) NULL);
+
+  return spd;
+}
+
+int mmap_get_id	(void)
+{
+  static int id = 1;
+
+  return id++;
+}

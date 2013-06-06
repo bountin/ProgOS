@@ -388,6 +388,9 @@ load (void *aux, void (**eip) (void), void **esp)
   t->supp_pagedir = supp_pagedir_create ();
   if (t->supp_pagedir == NULL)
     return false;
+  t->mmap_id_dir = mmap_id_create ();
+  if (t->mmap_id_dir == NULL)
+    return false;
   process_activate ();
 
   /* Coarse grained filesystem lock for loading */
@@ -578,7 +581,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     spt_elem = malloc (sizeof (struct spt_elem));
     spt_elem->file = file;
     spt_elem->file_offset = ofs;
-    spt_elem->upage = upage;
+    spt_elem->upage = (uint32_t) upage;
     spt_elem->read_bytes = page_read_bytes;
     spt_elem->zero_bytes = page_zero_bytes;
     spt_elem->writeable = writable;
