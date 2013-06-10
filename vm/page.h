@@ -26,6 +26,6 @@ struct hash *mmap_id_create (void);
 
 int mmap_get_id (void);
 
-bool page_load (void *addr);
+bool page_load (void *addr, void *esp);
 
 void page_unmap (mapid_t mmap_id);

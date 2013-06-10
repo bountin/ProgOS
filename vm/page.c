@@ -36,7 +36,7 @@ struct hash *supp_pagedir_create (void)
   return spd;
 }
 
-bool page_load (void *addr)
+bool page_load (void *addr, void *esp)
 {
   struct spt_elem search;
   struct spt_elem *spt;
@@ -65,16 +65,25 @@ bool page_load (void *addr)
     }
     memset (kpage + spt->read_bytes, 0, spt->zero_bytes);
     writeable = spt->writeable;
-  } else {
-    return false;
-    memset (kpage, 0, PGSIZE);
-    writeable = true;
-  }
 
-  /* Add the page to the process's address space. */
-  if (!install_page (spt->upage, kpage, writeable)) {
-    palloc_free_page (kpage);
-    return false;
+    /* Add the page to the process's address space. */
+    if (!install_page (spt->upage, kpage, writeable)) {
+      palloc_free_page (kpage);
+      return false;
+    }
+  } else {
+    if (t->esp != NULL)
+      esp = t->esp;
+    if (addr > esp || ((uint32_t)esp - (uint32_t)addr) <= 32) {
+      // Install stack page
+      if (!install_page ((void *)search.upage, kpage, true)) {
+        palloc_free_page (kpage);
+        return false;
+      }
+    } else {
+      palloc_free_page (kpage);
+      return false;
+    }
   }
 
   return true;

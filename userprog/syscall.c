@@ -201,6 +201,9 @@ syscall_handler (struct intr_frame *f)
   bool segfault = false;
   int result;
   void *sp = f->esp;
+  struct thread *t = thread_current ();
+
+  t->esp = sp;
 
   /* The system call number and the arguments are on the stack */
   if (! copy_from_user (&syscall_nr,sp))
@@ -228,6 +231,7 @@ syscall_handler (struct intr_frame *f)
   if (segfault)
     goto fail;
   f->eax = result;
+  t->esp = NULL;
   return;
 
   fail:
