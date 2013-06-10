@@ -598,7 +598,12 @@ syscall_mmap (void *sp, bool *segfault)
   struct file *file = NULL;
   file = process_get_file (fd);
   if (file == NULL)
-    return -1;
+    return MAP_FAILED;
+
+  /* Reopen the file that userprog can close the fd */
+//  file = file_reopen (file);
+//  if (file == NULL)
+//    return MAP_FAILED;
 
   process_lock_filesys ();
   size = inode_length (file_get_inode (file));
@@ -607,17 +612,23 @@ syscall_mmap (void *sp, bool *segfault)
   if (size == 0)
     return MAP_FAILED;
 
-  for (upage = addr; upage < addr + size; upage += PGSIZE)
+  for (upage = (uint32_t)addr; upage < (uint32_t)addr + size; upage += PGSIZE) {
     if (pagedir_get_page (t->pagedir, (void *)upage) != NULL)
       return MAP_FAILED;
 
+    struct spt_elem spt_search;
+    spt_search.upage = upage;
+    if (hash_find (t->supp_pagedir, &spt_search.hash_elem) != NULL)
+      return MAP_FAILED;
+  }
+
   struct mmap_id_elem *mmap_elem = malloc (sizeof (struct mmap_id_elem));
   mmap_elem->mmap_id = mmap_get_id ();
-  mmap_elem->upage = (uint32_t) upage;
+  mmap_elem->upage = (uint32_t) addr;
   mmap_elem->size = size;
   hash_insert (t->mmap_id_dir, &mmap_elem->hash_elem);
 
-  int i;
+  unsigned int i;
   for (i = 0; i * PGSIZE < size; i++) {
     int page_read_bytes, page_zero_bytes;
 
@@ -645,5 +656,39 @@ syscall_mmap (void *sp, bool *segfault)
 static int
 syscall_munmap (void *sp, bool *segfault)
 {
-  mapid_t mapping;
+  mapid_t mmap_id;
+  struct thread *t = thread_current ();
+  unsigned int i;
+
+  if (! copy_from_user (&mmap_id, STACK_ADDR (sp,1))) {
+    *segfault = true;
+    return 0;
+  }
+
+  struct mmap_id_elem *mmap_id_elem;
+  struct hash_elem *hash_elem;
+
+  /* Search for mmap_id element */
+  struct mmap_id_elem mmap_search;
+  mmap_search.mmap_id = mmap_id;
+  hash_elem = hash_find (t->mmap_id_dir, &mmap_search.hash_elem);
+  mmap_id_elem = hash_entry (hash_elem, struct mmap_id_elem, hash_elem);
+  if (mmap_id_elem == NULL)
+    return 0;
+
+  uint32_t upage = mmap_id_elem->upage;
+  for (i = 0; i * PGSIZE < mmap_id_elem->size; i++) {
+    /* Remove page from supplemental page directory */
+    struct spt_elem spt_elem_search, *spt_elem;
+    spt_elem_search.upage = upage + i * PGSIZE;
+    hash_elem = hash_delete (t->supp_pagedir, &spt_elem_search.hash_elem);
+    spt_elem = hash_entry (hash_elem, struct spt_elem, hash_elem);
+    ASSERT (spt_elem != NULL);
+    free (spt_elem);
+
+    /* (Maybe) remove page from page directory */
+    pagedir_clear_page (t->pagedir, (void *)upage);
+  }
+
+  return 0;
 }
