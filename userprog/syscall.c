@@ -14,6 +14,9 @@
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "userprog/syscall.h"
+#include "lib/user/syscall.h"
+#include "threads/malloc.h"
+#include "vm/page.h"
 
 #define STACK_SLOT_SIZE sizeof(int)
 
@@ -178,7 +181,9 @@ static handler
   syscall_read,
   syscall_seek,
   syscall_tell,
-  syscall_close;
+  syscall_close,
+  syscall_mmap,
+  syscall_munmap;
 
 /* Register syscall_handler for interrupt 0x30 */
 void
@@ -196,6 +201,9 @@ syscall_handler (struct intr_frame *f)
   bool segfault = false;
   int result;
   void *sp = f->esp;
+  struct thread *t = thread_current ();
+
+  t->esp = sp;
 
   /* The system call number and the arguments are on the stack */
   if (! copy_from_user (&syscall_nr,sp))
@@ -214,6 +222,8 @@ syscall_handler (struct intr_frame *f)
   case SYS_SEEK: fp = syscall_seek; break;
   case SYS_TELL: fp = syscall_tell; break;
   case SYS_CLOSE: fp = syscall_close; break;
+  case SYS_MMAP: fp = syscall_mmap; break;
+  case SYS_MUNMAP: fp = syscall_munmap; break;
   default:
     goto fail;
   }
@@ -221,6 +231,7 @@ syscall_handler (struct intr_frame *f)
   if (segfault)
     goto fail;
   f->eax = result;
+  t->esp = NULL;
   return;
 
   fail:
@@ -559,5 +570,103 @@ syscall_close (void *sp, bool *segfault)
 
   /* no way to return something sensible function (void) */
   (void) process_close_file (fd);
+  return 0;
+}
+
+static int
+syscall_mmap (void *sp, bool *segfault)
+{
+  int fd;
+  void *addr;
+  uint32_t upage, size;
+  struct thread *t = thread_current ();
+  struct spt_elem *spt_elem;
+
+  if (! copy_from_user (&fd, STACK_ADDR (sp,1)) ||
+      ! copy_from_user (&addr, STACK_ADDR (sp, 2))) {
+    *segfault = true;
+    return 0; /* vlt -1? */
+  }
+
+  if (addr == 0)
+    return MAP_FAILED;
+
+  if ((uint32_t)addr % PGSIZE != 0)
+    return MAP_FAILED;
+
+  /* stdin and stdout are not mappable */
+  if (fd == 0 || fd == 1)
+    return MAP_FAILED;
+
+  /* Check file pointer for existence */
+  struct file *file = NULL;
+  file = process_get_file (fd);
+  if (file == NULL)
+    return MAP_FAILED;
+
+  /* Reopen the file that userprog can close the fd */
+  file = file_reopen (file);
+  if (file == NULL)
+    return MAP_FAILED;
+
+  process_lock_filesys ();
+  size = inode_length (file_get_inode (file));
+  process_unlock_filesys ();
+
+  if (size == 0)
+    return MAP_FAILED;
+
+  for (upage = (uint32_t)addr; upage < (uint32_t)addr + size; upage += PGSIZE) {
+    if (pagedir_get_page (t->pagedir, (void *)upage) != NULL)
+      return MAP_FAILED;
+
+    struct spt_elem spt_search;
+    spt_search.upage = upage;
+    if (hash_find (t->supp_pagedir, &spt_search.hash_elem) != NULL)
+      return MAP_FAILED;
+  }
+
+  struct mmap_id_elem *mmap_elem = malloc (sizeof (struct mmap_id_elem));
+  mmap_elem->mmap_id = mmap_get_id ();
+  mmap_elem->upage = (uint32_t) addr;
+  mmap_elem->size = size;
+  hash_insert (t->mmap_id_dir, &mmap_elem->hash_elem);
+
+  unsigned int i;
+  for (i = 0; i * PGSIZE < size; i++) {
+    int page_read_bytes, page_zero_bytes;
+
+    page_read_bytes = size - i * PGSIZE;
+    if (page_read_bytes > PGSIZE)
+      page_read_bytes = PGSIZE;
+    page_zero_bytes = PGSIZE - page_read_bytes;
+
+    upage = (uint32_t) addr + i * PGSIZE;
+
+    spt_elem = malloc (sizeof (struct spt_elem));
+    spt_elem->file = file;
+    spt_elem->file_offset = PGSIZE * i;
+    spt_elem->upage = upage;
+    spt_elem->read_bytes = page_read_bytes;
+    spt_elem->zero_bytes = page_zero_bytes;
+    spt_elem->writeable = 1;
+
+    hash_insert (t->supp_pagedir, &spt_elem->hash_elem);
+  }
+
+  return mmap_elem->mmap_id;
+}
+
+static int
+syscall_munmap (void *sp, bool *segfault)
+{
+  mapid_t mmap_id;
+
+  if (! copy_from_user (&mmap_id, STACK_ADDR (sp,1))) {
+    *segfault = true;
+    return 0;
+  }
+
+  page_unmap (mmap_id);
   return 0;
 }

@@ -1,0 +1,167 @@
+   	    +---------------------------+
+		    |         ProgOS		        |
+		    | PROJECT 2: VIRTUAL MEMORY	|
+		    |	   DESIGN DOCUMENT	      |
+		    +---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Mihail Bogojeski <e1127083@student.tuwien.ac.at>
+Martin Prebio <martin.prebio@gmail.com>
+Alexander Svozil <e1026213@student.tuwien.ac.at>
+
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			PAGE TABLE MANAGEMENT
+			=====================
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+struct spt_elem {
+  struct hash_elem hash_elem;
+
+  struct file *file;
+  off_t file_offset;
+  uint32_t upage;
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
+  bool writeable;
+};
+The page Element for the supplemental page table.
+
+struct hash *supp_pagedir;
+The supplemental page table in struct thread
+
+---- IMPLEMENTATION ----
+>> A2: Describe how you implemented lazy page loading. How do you
+>> determine the file and file offset corresponding to a virtual
+>> address?
+
+In load_segment we have a loop that generates the suppl. page table entries and inserts them in to the threads page table. 
+All the necessary data is a already supplied as parameters in the load_segment function and we just.
+page_load is called on a page fault, if the page is found in our supplemental page table.
+
+The file and file offset are already given as parameters in the load segment function and we just save these values in our supp. page table entry. 
+
+
+---- SYNCHRONIZATION ----
+>> A3: How do you deal with or prevent page faults in file system
+>> routines. Argue why your solution is deadlock free.
+There is a lock for the file system which was already implemented.
+
+
+			    STACK GROWTH
+			    ============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+    void *esp;
+The esp pointer in thread makes sure, that if a system call is called from kernel space, the esp pointer of the user space is then used for allocating
+new pages on the stack and not some undefined values.
+
+
+
+---- IMPLEMENTATION ----
+>> B2: Describe how you integrated the (potentially growing) stack segment
+>> into your page table management implementation.
+If the address that faulted is not found in the supplemental page table it's possible that stack growth is required. The stack growth is achieved by allocating a new virtual memory page for the stack.
+
+---- ALGORITHMS ----
+>> B3: Explain how you detect a page fault which should trigger a
+>> stack growth. What asssumptions are needed for your implementation
+>> to work?
+If the difference between stack pointer and the faulted address is less then or equal to 32(the stack pointer adress > faulted adress),
+then we conclude stack growth is required and we install a new page for the needed space on the stack.(A PUSH or a PUSHA occurred.) 
+If the stack pointer adress is smaller than the faulted adress our heuristic concludes, that the stackpointer was changed by a MOV or something else than PUSH or PUSHA. 
+In this case we also allocate a page if the stack pointer does not surpass our stack size limit of 8MB.
+
+
+			 MEMORY MAPPED FILES
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+struct mmap_id_elem {
+       struct hash_elem hash_elem;
+
+       int mmap_id;
+       uint32_t upage;
+       uint32_t size;
+};
+the mmap elements used for identifying the files in memory 
+
+In struct thread
+    struct hash *mmap_id_dir;
+Each thread gets a hashmap of mmap_ids, one for each mmap call
+
+---- ALGORITHMS ----
+
+>> C2: Describe how memory mapped files integrate into your virtual
+>> memory subsystem.
+Our thread has a mmap hashtable which saves the above mentioned mmap_id_elems. When mmap is being called a new entry in our supplemental
+pagetable and in our mmap hashtable is created with the file processed by mmap.
+
+
+>> C3: Explain how you determine whether a new file mapping overlaps
+>> any existing segment.
+In a loop we repeatedly increase the starting address of the file mapping by the size of a page and
+check if the resulting adress can be found in the original page table with the function pagedir_get_page.
+If the function returns a page, it means that this address belongs to a page already in the page table, meaning that this page overlaps the file mapping.
+
+---- RATIONALE ----
+
+>> C4: Mappings created with "mmap" have similar semantics to those of
+>> data demand-paged from executables, except that "mmap" mappings are
+>> written back to their original files, not to swap.  This implies
+>> that much of their implementation can be shared.  Explain why your
+>> implementation either does or does not share much of the code for
+>> the two situations.
+
+Since we implementated mmap after we implemented the page loading sharing implementation means
+that we had to refactor a lot of our code which we didn't want to do because it doesn't change
+the efficiency of our implementations.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
+

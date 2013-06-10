@@ -154,7 +154,8 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
   if (is_user_vaddr(fault_addr)) {
     if (not_present) {
-      page_load (fault_addr);
+      if (!page_load (fault_addr, f->esp))
+        thread_exit ();
       return;
     }
 

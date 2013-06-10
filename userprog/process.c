@@ -243,6 +243,16 @@ process_exit (void)
     lock_release (&filesys_lock);
   }
 
+  mapid_t mapid;
+  struct hash_iterator mapid_iter;
+
+  while (hash_size (thread->mmap_id_dir) > 0) {
+    hash_first (&mapid_iter, thread->mmap_id_dir);
+    hash_next (&mapid_iter);
+    mapid = hash_entry (hash_cur (&mapid_iter), struct mmap_id_elem, hash_elem)->mmap_id;
+    page_unmap (mapid);
+  }
+
   int fd;
   for (fd = 2; fd <= proc->fd_table.fd_max; fd++) {
     process_close_file (fd);
@@ -387,6 +397,9 @@ load (void *aux, void (**eip) (void), void **esp)
     return false;
   t->supp_pagedir = supp_pagedir_create ();
   if (t->supp_pagedir == NULL)
+    return false;
+  t->mmap_id_dir = mmap_id_create ();
+  if (t->mmap_id_dir == NULL)
     return false;
   process_activate ();
 
@@ -578,7 +591,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     spt_elem = malloc (sizeof (struct spt_elem));
     spt_elem->file = file;
     spt_elem->file_offset = ofs;
-    spt_elem->upage = upage;
+    spt_elem->upage = (uint32_t) upage;
     spt_elem->read_bytes = page_read_bytes;
     spt_elem->zero_bytes = page_zero_bytes;
     spt_elem->writeable = writable;
