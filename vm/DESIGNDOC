@@ -50,11 +50,12 @@ The supplemental page table in struct thread
 >> determine the file and file offset corresponding to a virtual
 >> address?
 
-In load_segment we have a loop that generates the suppl. page table entries and inserts them in to the threads page table. 
-All the necessary data is a already supplied as parameters in the load_segment function and we just.
-page_load is called on a page fault, if the page is found in our supplemental page table.
+In load_segment we have a loop that generates the suppl. page table entries and inserts them in to the page table of the thread(in case the segment to be loaded is greater than 1 page). In each iteration, the read_bytes are decreased as long as the read_bytes are greater than the page size, and each time we add an entry to the table that represents a page. On the end of each iteration the file address and offset are also increased and in the end, the whole segment to be loaded is actually seperated in individual page table entries (each representing a page in virtual memory with all the necessary data) that are added to the threads supplemental page table.
 
-The file and file offset are already given as parameters in the load segment function and we just save these values in our supp. page table entry. 
+When a page fault occurs, our page_load function is called. Lazy loading occurs naturally, since as stated before, we seperate each segment into individual page entries in our supplemental page table. We simply need to mask the address that faulted to get the page this address belongs to, and then simply search for this page in our supplemental page table. If the entry is found, we read from the corresponding file (with the corresponding offset) into the newly allocated kernel page and add the mapping to this page in the original page table (with install_page).
+
+All the initial data is a already supplied as parameters in the load_segment function. We save the same file for all our page entries in the supplemental page table, and the initial offset is repeatedly increased by the page size for every new page entry created for the same segment.
+page_load is called on a page fault, if the page is found in our supplemental page table. 
 
 
 ---- SYNCHRONIZATION ----
@@ -89,7 +90,7 @@ If the address that faulted is not found in the supplemental page table it's pos
 >> to work?
 If the difference between stack pointer and the faulted address is less then or equal to 32(the stack pointer adress > faulted adress),
 then we conclude stack growth is required and we install a new page for the needed space on the stack.(A PUSH or a PUSHA occurred.) 
-If the stack pointer adress is smaller than the faulted adress our heuristic concludes, that the stackpointer was changed by a MOV or something else than PUSH or PUSHA. 
+If the stack pointer adress is smaller than the faulted adress, our heuristic concludes that the stackpointer was changed by a MOV or something else than PUSH or PUSHA. 
 In this case we also allocate a page if the stack pointer does not surpass our stack size limit of 8MB.
 
 
@@ -118,9 +119,8 @@ Each thread gets a hashmap of mmap_ids, one for each mmap call
 
 >> C2: Describe how memory mapped files integrate into your virtual
 >> memory subsystem.
-Our thread has a mmap hashtable which saves the above mentioned mmap_id_elems. When mmap is being called a new entry in our supplemental
-pagetable and in our mmap hashtable is created with the file processed by mmap.
-
+Our thread has a mmap hash table which saves the above mentioned mmap_id_elems. When mmap is called we create a new corresponding entry in our mmap hash table and (maybe) multiple new entries in our supplemental page table (similar to load_segment).
+When munmap is called, we find the mmap entry in the mmap hash table, delete this entry from the mmap table. Starting from the initial user page address of the mapping we loop and delete every corresponding entry in the supplemental and original page table (since the file mapping is also split into idividual page table entries) increasing the starting page address by the page size on every iteration. For each deleted entry, before its remove from the original page table, we also check if the page is dirty (modified). If this is the case, we write this page back in the corresponding position in the file.
 
 >> C3: Explain how you determine whether a new file mapping overlaps
 >> any existing segment.
@@ -137,9 +137,9 @@ If the function returns a page, it means that this address belongs to a page alr
 >> implementation either does or does not share much of the code for
 >> the two situations.
 
-Since we implementated mmap after we implemented the page loading sharing implementation means
-that we had to refactor a lot of our code which we didn't want to do because it doesn't change
-the efficiency of our implementations.
+Since we implemented mmap after we implemented the page loading, sharingt the implementation ment
+that we had to refactor and change a lot of our already functioning code, which could produce a lot of additional work for us (even though it doesunt improve the efficiency of our program).
+This is why we wanted to keep the implementation simple and seperate.
 
 			   SURVEY QUESTIONS
 			   ================
