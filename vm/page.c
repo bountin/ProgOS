@@ -8,6 +8,7 @@
 #include "threads/palloc.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
 
 static unsigned
 page_hash (const struct hash_elem *elem, void *aux UNUSED)
@@ -110,4 +111,42 @@ int mmap_get_id	(void)
   static int id = 1;
 
   return id++;
+}
+
+void page_unmap (mapid_t mmap_id)
+{
+  struct mmap_id_elem *mmap_id_elem;
+  struct hash_elem *hash_elem;
+  struct thread *t = thread_current ();
+  unsigned int i;
+
+  /* Search for mmap_id element */
+  struct mmap_id_elem mmap_search;
+  mmap_search.mmap_id = mmap_id;
+  hash_elem = hash_delete (t->mmap_id_dir, &mmap_search.hash_elem);
+  mmap_id_elem = hash_entry (hash_elem, struct mmap_id_elem, hash_elem);
+  if (mmap_id_elem == NULL)
+    return;
+
+  uint32_t upage = mmap_id_elem->upage;
+  for (i = 0; i * PGSIZE < mmap_id_elem->size; i++) {
+    /* Remove page from supplemental page directory */
+    struct spt_elem spt_elem_search, *spt_elem;
+    spt_elem_search.upage = upage + i * PGSIZE;
+    hash_elem = hash_delete (t->supp_pagedir, &spt_elem_search.hash_elem);
+    spt_elem = hash_entry (hash_elem, struct spt_elem, hash_elem);
+    ASSERT (spt_elem != NULL);
+
+    /* Write the page back to the file */
+    void *kpage = pagedir_get_page (t->pagedir, (void *)(upage + i*PGSIZE));
+    if ((kpage != NULL) && pagedir_is_dirty (t->pagedir, (void *)(upage + i*PGSIZE))) {
+      file_write_at (spt_elem->file, kpage, spt_elem->read_bytes, spt_elem->file_offset);
+    }
+
+    /* (Maybe) remove page from page directory */
+    pagedir_clear_page (t->pagedir, (void *)upage);
+
+    free (spt_elem);
+  }
+  free (mmap_id_elem);
 }

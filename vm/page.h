@@ -1,5 +1,6 @@
 #include <hash.h>
 #include "filesys/off_t.h"
+#include "lib/user/syscall.h"
 
 struct spt_elem {
 	struct hash_elem hash_elem;
@@ -26,3 +27,5 @@ struct hash *mmap_id_create (void);
 int mmap_get_id (void);
 
 bool page_load (void *addr);
+
+void page_unmap (mapid_t mmap_id);

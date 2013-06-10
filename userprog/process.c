@@ -243,6 +243,16 @@ process_exit (void)
     lock_release (&filesys_lock);
   }
 
+  mapid_t mapid;
+  struct hash_iterator mapid_iter;
+
+  while (hash_size (thread->mmap_id_dir) > 0) {
+    hash_first (&mapid_iter, thread->mmap_id_dir);
+    hash_next (&mapid_iter);
+    mapid = hash_entry (hash_cur (&mapid_iter), struct mmap_id_elem, hash_elem)->mmap_id;
+    page_unmap (mapid);
+  }
+
   int fd;
   for (fd = 2; fd <= proc->fd_table.fd_max; fd++) {
     process_close_file (fd);
