@@ -684,10 +684,17 @@ syscall_munmap (void *sp, bool *segfault)
     hash_elem = hash_delete (t->supp_pagedir, &spt_elem_search.hash_elem);
     spt_elem = hash_entry (hash_elem, struct spt_elem, hash_elem);
     ASSERT (spt_elem != NULL);
-    free (spt_elem);
+
+    /* Write the page back to the file */
+    void *kpage = pagedir_get_page (t->pagedir, (void *)upage);
+    if (kpage != NULL) {
+      file_write_at (spt_elem->file, kpage, spt_elem->read_bytes, spt_elem->file_offset);
+    }
 
     /* (Maybe) remove page from page directory */
     pagedir_clear_page (t->pagedir, (void *)upage);
+
+    free (spt_elem);
   }
 
   return 0;

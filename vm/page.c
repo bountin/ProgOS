@@ -58,8 +58,7 @@ bool page_load (void *addr)
     spt = hash_entry (e, struct spt_elem, hash_elem);
 
     /* Load this page. */
-    file_seek (spt->file, spt->file_offset);
-    if (file_read (spt->file, kpage, spt->read_bytes) != (int) spt->read_bytes) {
+    if (file_read_at (spt->file, kpage, spt->read_bytes, spt->file_offset) != (int) spt->read_bytes) {
       palloc_free_page (kpage);
       return false;
     }
