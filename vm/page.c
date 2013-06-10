@@ -74,6 +74,11 @@ bool page_load (void *addr, void *esp)
   } else {
     if (t->esp != NULL)
       esp = t->esp;
+    if (esp < PHYS_BASE - 8*1024*1024) {
+      // Limiting stack to 8 MB
+      palloc_free_page (kpage);
+      return false;
+    }
     if (addr > esp || ((uint32_t)esp - (uint32_t)addr) <= 32) {
       // Install stack page
       if (!install_page ((void *)search.upage, kpage, true)) {
