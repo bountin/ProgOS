@@ -67,7 +67,7 @@ bool page_load (void *addr, void *esp)
     writeable = spt->writeable;
 
     /* Add the page to the process's address space. */
-    if (!install_page (spt->upage, kpage, writeable)) {
+    if (!install_page ((void *)spt->upage, kpage, writeable)) {
       palloc_free_page (kpage);
       return false;
     }
