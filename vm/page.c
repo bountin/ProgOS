@@ -55,7 +55,7 @@ bool page_load (void *addr, void *esp)
   e = hash_find (t->supp_pagedir, &search.hash_elem);
 
   if (e != NULL) {
-    // Page was found in the suppl. page directory
+    /* Page was found in the suppl. page directory */
     spt = hash_entry (e, struct spt_elem, hash_elem);
 
     /* Load this page. */
@@ -75,12 +75,12 @@ bool page_load (void *addr, void *esp)
     if (t->esp != NULL)
       esp = t->esp;
     if (esp < PHYS_BASE - 8*1024*1024) {
-      // Limiting stack to 8 MB
+      /* Limiting stack to 8 MB */
       palloc_free_page (kpage);
       return false;
     }
     if (addr > esp || ((uint32_t)esp - (uint32_t)addr) <= 32) {
-      // Install stack page
+      /* Install stack page */
       if (!install_page ((void *)search.upage, kpage, true)) {
         palloc_free_page (kpage);
         return false;

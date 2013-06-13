@@ -243,9 +243,9 @@ process_exit (void)
     lock_release (&filesys_lock);
   }
 
+  /* unmap all mmap'ed pages */
   mapid_t mapid;
   struct hash_iterator mapid_iter;
-
   while (hash_size (thread->mmap_id_dir) > 0) {
     hash_first (&mapid_iter, thread->mmap_id_dir);
     hash_next (&mapid_iter);
@@ -588,6 +588,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+    /* save page information for lazy-loading */
     spt_elem = malloc (sizeof (struct spt_elem));
     spt_elem->file = file;
     spt_elem->file_offset = ofs;
@@ -595,7 +596,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     spt_elem->read_bytes = page_read_bytes;
     spt_elem->zero_bytes = page_zero_bytes;
     spt_elem->writeable = writable;
-//    printf ("INSERT: %s P: %p RB: %i MP: %p\n", t->name, spt_elem, page_read_bytes, upage);
     hash_insert (t->supp_pagedir, &spt_elem->hash_elem);
 
     /* Advance. */

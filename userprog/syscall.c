@@ -585,12 +585,13 @@ syscall_mmap (void *sp, bool *segfault)
   if (! copy_from_user (&fd, STACK_ADDR (sp,1)) ||
       ! copy_from_user (&addr, STACK_ADDR (sp, 2))) {
     *segfault = true;
-    return 0; /* vlt -1? */
+    return 0;
   }
 
   if (addr == 0)
     return MAP_FAILED;
 
+  /* adress must be page aligned */
   if ((uint32_t)addr % PGSIZE != 0)
     return MAP_FAILED;
 
@@ -604,7 +605,7 @@ syscall_mmap (void *sp, bool *segfault)
   if (file == NULL)
     return MAP_FAILED;
 
-  /* Reopen the file that userprog can close the fd */
+  /* Reopen the file so that userprog can close the fd */
   file = file_reopen (file);
   if (file == NULL)
     return MAP_FAILED;
@@ -616,6 +617,7 @@ syscall_mmap (void *sp, bool *segfault)
   if (size == 0)
     return MAP_FAILED;
 
+  /* Check if pages are already used */
   for (upage = (uint32_t)addr; upage < (uint32_t)addr + size; upage += PGSIZE) {
     if (pagedir_get_page (t->pagedir, (void *)upage) != NULL)
       return MAP_FAILED;
